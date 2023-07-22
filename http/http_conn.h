@@ -29,10 +29,10 @@
 class http_conn
 {
 public:
-    static const int FILENAME_LEN = 200;
-    static const int READ_BUFFER_SIZE = 2048;
-    static const int WRITE_BUFFER_SIZE = 1024;
-    enum METHOD
+    static const int FILENAME_LEN = 200;//设置读取文件的名称m_real_file大小
+    static const int READ_BUFFER_SIZE = 2048;//设置读缓冲区m_read_buf大小
+    static const int WRITE_BUFFER_SIZE = 1024;//设置写缓冲区m_write_buf大小
+    enum METHOD//报文的请求方法，本项目只用到GET和POST
     {
         GET = 0,
         POST,
@@ -44,13 +44,13 @@ public:
         CONNECT,
         PATH
     };
-    enum CHECK_STATE
+    enum CHECK_STATE//主状态机的状态
     {
         CHECK_STATE_REQUESTLINE = 0,
         CHECK_STATE_HEADER,
         CHECK_STATE_CONTENT
     };
-    enum HTTP_CODE
+    enum HTTP_CODE//报文解析的结果
     {
         NO_REQUEST,
         GET_REQUEST,
@@ -61,7 +61,7 @@ public:
         INTERNAL_ERROR,
         CLOSED_CONNECTION
     };
-    enum LINE_STATUS
+    enum LINE_STATUS//从状态机的状态
     {
         LINE_OK = 0,
         LINE_BAD,
@@ -108,36 +108,41 @@ private:
     bool add_blank_line();
 
 public:
-    static int m_epollfd;
-    static int m_user_count;
+    static int m_epollfd;//应该是指示epoll内核事件表的文件描述符，即epoll_create()的返回
+    static int m_user_count;//最大用户数？
     MYSQL *mysql;
     int m_state;  //读为0, 写为1
 
 private:
-    int m_sockfd;
-    sockaddr_in m_address;
-    char m_read_buf[READ_BUFFER_SIZE];
-    long m_read_idx;
-    long m_checked_idx;
-    int m_start_line;
-    char m_write_buf[WRITE_BUFFER_SIZE];
-    int m_write_idx;
-    CHECK_STATE m_check_state;
-    METHOD m_method;
+    int m_sockfd;//根据后面程序，应该是该http_conn对象所在数组所在索引，也就理解为描述符
+    sockaddr_in m_address;//应该是用户地址套接字
+    char m_read_buf[READ_BUFFER_SIZE];//存储读取的请求报文数据
+    long m_read_idx;//缓冲区中m_read_buf中数据的最后一个字节的下一个位置
+    long m_checked_idx;//m_read_buf读取的位置m_checked_idx
+    int m_start_line;//m_read_buf中已经解析的字符个数
+    char m_write_buf[WRITE_BUFFER_SIZE];//存储发出的响应报文数据
+    int m_write_idx;//指示buffer中的长度
+    CHECK_STATE m_check_state;//主状态机的状态
+    METHOD m_method;//请求方法
+
+    //以下为解析请求报文中对应的6个变量
+    //存储读取文件的名称
     char m_real_file[FILENAME_LEN];
     char *m_url;
     char *m_version;
     char *m_host;
     long m_content_length;
     bool m_linger;
-    char *m_file_address;
+
+
+    char *m_file_address;//读取服务器上的文件地址
     struct stat m_file_stat;
-    struct iovec m_iv[2];
+    struct iovec m_iv[2];//io向量机制iovec
     int m_iv_count;
     int cgi;        //是否启用的POST
     char *m_string; //存储请求头数据
-    int bytes_to_send;
-    int bytes_have_send;
+    int bytes_to_send;//剩余发送字节数
+    int bytes_have_send;//已发送字节数
     char *doc_root;
 
     map<string, string> m_users;
