@@ -12,14 +12,19 @@ template <typename T>
 class threadpool
 {
 public:
-    /*thread_number是线程池中线程的数量，max_requests是请求队列中最多允许的、等待处理的请求的数量*/
+    /*thread_number是线程池中线程的数量，
+    max_requests是请求队列中最多允许的、等待处理的请求的数量*/
     threadpool(int actor_model, connection_pool *connPool, int thread_number = 8, int max_request = 10000);
     ~threadpool();
     bool append(T *request, int state);
     bool append_p(T *request);
 
 private:
-    /*工作线程运行的函数，它不断从工作队列中取出任务并执行之*/
+    /*工作线程运行的函数，它不断从工作队列中取出任务并执行之
+    pthread_create的函数原型中第三个参数的类型为函数指针，指向的线程处理函数参数类型为(void *),
+    若线程函数为类成员函数，则this指针会作为默认的参数被传进函数中，从而和线程函数参数(void*)不能匹配，不能通过编译。
+    */
+    
     static void *worker(void *arg);
     void run();
 
@@ -43,12 +48,16 @@ threadpool<T>::threadpool( int actor_model, connection_pool *connPool, int threa
         throw std::exception();
     for (int i = 0; i < thread_number; ++i)
     {
+        /*
+        worker //处理线程的函数的地址
+        this   //worker()中的参数
+        */
         if (pthread_create(m_threads + i, NULL, worker, this) != 0)
         {
             delete[] m_threads;
             throw std::exception();
         }
-        if (pthread_detach(m_threads[i]))
+        if (pthread_detach(m_threads[i]))//将线程进行分离后，不用单独对工作线程进行回收
         {
             delete[] m_threads;
             throw std::exception();
@@ -60,10 +69,13 @@ threadpool<T>::~threadpool()
 {
     delete[] m_threads;
 }
+
+/*-----------------方法之中凡是操作线程共享变量，全部加锁，这里即请求队列-----------------------------------*/
+//往请求队列里加
 template <typename T>
 bool threadpool<T>::append(T *request, int state)
 {
-    m_queuelocker.lock();
+    m_queuelocker.lock();//上锁
     if (m_workqueue.size() >= m_max_requests)
     {
         m_queuelocker.unlock();
@@ -89,6 +101,8 @@ bool threadpool<T>::append_p(T *request)
     m_queuestat.post();
     return true;
 }
+
+// ···············处理线程的函数的地址···············
 template <typename T>
 void *threadpool<T>::worker(void *arg)
 {
@@ -96,32 +110,39 @@ void *threadpool<T>::worker(void *arg)
     pool->run();
     return pool;
 }
+
+
 template <typename T>
 void threadpool<T>::run()
 {
     while (true)
     {
+        //信号量等待
         m_queuestat.wait();
+        //被唤醒后先加互斥锁
         m_queuelocker.lock();
+        //取出需求
         if (m_workqueue.empty())
         {
             m_queuelocker.unlock();
             continue;
         }
-        T *request = m_workqueue.front();
+        T *request = m_workqueue.front();//其实就是http_conn类
         m_workqueue.pop_front();
         m_queuelocker.unlock();
         if (!request)
             continue;
+
+        //
         if (1 == m_actor_model)
         {
             if (0 == request->m_state)
             {
-                if (request->read_once())
+                if (request->read_once())//read_once()循环读取客户数据，直到无数据可读或对方关闭连接
                 {
-                    request->improv = 1;
+                    request->improv = 1; //这个是什么不太清楚
                     connectionRAII mysqlcon(&request->mysql, m_connPool);
-                    request->process();
+                    request->process();//http处理
                 }
                 else
                 {

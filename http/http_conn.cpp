@@ -50,12 +50,13 @@ void http_conn::initmysql_result(connection_pool *connPool)
 //对文件描述符设置非阻塞
 int setnonblocking(int fd)
 {
-    int old_option = fcntl(fd, F_GETFL);
-    int new_option = old_option | O_NONBLOCK;
+    int old_option = fcntl(fd, F_GETFL);//fcntl()针对(文件)描述符提供控制.参数fd是被参数cmd操作(如下面的描述)的描述符.
+    int new_option = old_option | O_NONBLOCK;//
     fcntl(fd, F_SETFL, new_option);
     return old_option;
 }
 
+/*-------------------------------下面的三个函数全是对epoll_ctl()的封装*/
 //将内核事件表注册读事件，ET模式，选择开启EPOLLONESHOT
 void addfd(int epollfd, int fd, bool one_shot, int TRIGMode)
 {
@@ -69,7 +70,7 @@ void addfd(int epollfd, int fd, bool one_shot, int TRIGMode)
 
     if (one_shot)
         event.events |= EPOLLONESHOT;
-    epoll_ctl(epollfd, EPOLL_CTL_ADD, fd, &event);
+    epoll_ctl(epollfd, EPOLL_CTL_ADD, fd, &event);//操作内核事件表监控的文件描述符上的事件
     setnonblocking(fd);
 }
 
@@ -117,7 +118,7 @@ void http_conn::init(int sockfd, const sockaddr_in &addr, char *root, int TRIGMo
     m_address = addr;
 
     addfd(m_epollfd, sockfd, true, m_TRIGMode);
-    m_user_count++;
+    m_user_count++;//用户数
 
     //当浏览器出现连接重置时，可能是网站根目录出错或http响应格式出错或者访问的文件中内容完全为空
     doc_root = root;
@@ -128,7 +129,7 @@ void http_conn::init(int sockfd, const sockaddr_in &addr, char *root, int TRIGMo
     strcpy(sql_passwd, passwd.c_str());
     strcpy(sql_name, sqlname.c_str());
 
-    init();
+    init();//调用
 }
 
 //初始化新接受的连接
@@ -152,7 +153,7 @@ void http_conn::init()
     cgi = 0;
     m_state = 0;
     timer_flag = 0;
-    improv = 0;
+    improv = 0;//?
 
     memset(m_read_buf, '\0', READ_BUFFER_SIZE);
     memset(m_write_buf, '\0', WRITE_BUFFER_SIZE);
