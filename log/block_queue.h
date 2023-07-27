@@ -24,6 +24,7 @@ public:
             exit(-1);
         }
 
+        //构造函数创建循环数组
         m_max_size = max_size;
         m_array = new T[max_size];
         m_size = 0;
@@ -150,9 +151,10 @@ public:
     {
 
         m_mutex.lock();
+        //多个消费者的时候，这里要是用while而不是if
         while (m_size <= 0)
         {
-            
+            //当重新抢到互斥锁，pthread_cond_wait返回为0
             if (!m_cond.wait(m_mutex.get()))
             {
                 m_mutex.unlock();
@@ -160,6 +162,7 @@ public:
             }
         }
 
+        //取出队列首的元素，这里需要理解一下，使用循环数组模拟的队列 
         m_front = (m_front + 1) % m_max_size;
         item = m_array[m_front];
         m_size--;
@@ -168,6 +171,8 @@ public:
     }
 
     //增加了超时处理
+    //在pthread_cond_wait基础上增加了等待的时间，只指定时间内能抢到互斥锁即可
+    //其他逻辑不变
     bool pop(T &item, int ms_timeout)
     {
         struct timespec t = {0, 0};
@@ -199,6 +204,7 @@ public:
     }
 
 private:
+    //RAII封装的锁和条件变量
     locker m_mutex;
     cond m_cond;
 

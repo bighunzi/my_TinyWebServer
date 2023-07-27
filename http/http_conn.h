@@ -52,14 +52,14 @@ public:
     };
     enum HTTP_CODE//报文解析的结果
     {
-        NO_REQUEST,
-        GET_REQUEST,
-        BAD_REQUEST,
-        NO_RESOURCE,
-        FORBIDDEN_REQUEST,
-        FILE_REQUEST,
-        INTERNAL_ERROR,
-        CLOSED_CONNECTION
+        NO_REQUEST,//请求不完整，需要继续读取请求报文数据——————跳转主线程继续监测读事件
+        GET_REQUEST,//获得了完整的HTTP请求——————调用do_request完成请求资源映射
+        BAD_REQUEST,//HTTP请求报文有语法错误——————跳转process_write完成响应报文
+        NO_RESOURCE,//跳转process_write完成响应报文——————跳转process_write完成响应报文
+        FORBIDDEN_REQUEST,//请求资源禁止访问，没有读取权限——————跳转process_write完成响应报文
+        FILE_REQUEST,//请求资源可以正常访问——————请求资源可以正常访问
+        INTERNAL_ERROR,//服务器内部错误，该结果在主状态机逻辑switch的default下，一般不会触发——————
+        CLOSED_CONNECTION//——————
     };
     enum LINE_STATUS//从状态机的状态
     {
@@ -95,6 +95,8 @@ private:
     HTTP_CODE parse_headers(char *text);
     HTTP_CODE parse_content(char *text);
     HTTP_CODE do_request();
+    //m_start_line是行在buffer中的起始位置，将该位置后面的数据赋给text
+    //此时从状态机已提前将一行的末尾字符\r\n变为\0\0，所以text可以直接取出完整的行进行解析
     char *get_line() { return m_read_buf + m_start_line; };
     LINE_STATUS parse_line();
     void unmap();
